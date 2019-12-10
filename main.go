@@ -1,21 +1,29 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
 
 var (
-	logLevelStr string
+	logLevelStr  string
+	host         string
+	organization string
+	httpTimeout  time.Duration
 )
 
 func main() {
-	pflag.StringVarP(&logLevelStr, "log-level", "v", "info", "")
+	pflag.StringVarP(&logLevelStr, "log-level", "v", "info", "Logging level.")
+	pflag.StringVarP(&host, "host", "h", "github.com", "GitHub host to use.")
+	pflag.StringVarP(&organization, "organization", "o", "", "Limit search to certain organization.")
+	pflag.DurationVar(&httpTimeout, "http-timeout", 5*time.Second, "Timeout for HTTP Requests.")
 	pflag.Parse()
 
 	logLevel, err := logrus.ParseLevel(logLevelStr)
@@ -43,4 +51,19 @@ func main() {
 		log.Fatalf("Can not parse %q: %s", patternStr, err)
 	}
 	log.Debugf("Pattern: %s", pattern)
+
+	ctx := context.TODO()
+	client, err := getClient(ctx, host)
+	if err != nil {
+		log.Fatalf("Error creating client: %s", err)
+	}
+
+	repositories, _, err := client.Repositories.List(ctx, organization, nil)
+	if err != nil {
+		log.Fatalf("Error listing repositories: %s", err)
+	}
+
+	for _, repo := range repositories {
+		log.Debugf("Repo: %s", repo.GetCloneURL())
+	}
 }
